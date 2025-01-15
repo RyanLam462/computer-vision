@@ -1,0 +1,5 @@
+Python 3.10.11
+mediapipe             0.10.14
+numpy                 2.1.2
+pyrealsense2          2.55.1.6486
+opencv-python         4.10.0.84
