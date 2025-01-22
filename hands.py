@@ -22,7 +22,7 @@ if (useDepth):
         profile = pipe.start()
     except:
         useDepth = False
-        print("using webcam")
+        print("using depth")
         cap = cv2.VideoCapture(0)
 else:
     print("using webcam")
