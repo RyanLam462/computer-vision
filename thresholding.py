@@ -15,7 +15,7 @@ if useDepth:
         profile = pipe.start()
     except:
         useDepth = False
-        print("using depth")
+        print("using webcam")
         cap = cv2.VideoCapture(0)
 else:
     useDepth = False
@@ -37,13 +37,12 @@ while (1):
         depth = frames.get_depth_frame()
         depthImage = np.asanyarray(depth.get_data())
         depthImage = cv2.cvtColor(depthImage, cv2.COLOR_BGR2RGB)
-        depthImage = cv2.cvtColor(depthImage, cv2.COLOR_BGR2GRAY).astype("float32")
+        depthImage = cv2.cvtColor(depthImage, cv2.COLOR_BGR2GRAY).astype("uint16")
+        depthImage = (depthImage/256).astype('uint8')
 
         difference = len(depthImage[0]) - len(img[0])
 
         depthImage = depthImage[0:len(depthImage),int(difference/2):len(depthImage[0])-int(difference/2)]
-
-
     else:
         success, img = cap.read()
         if not success:
@@ -54,27 +53,26 @@ while (1):
 
     #edges = cv2.Canny(img,200,200)
 
-    #img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype("uint16")
 
     saturationVal = 3
 
     ##SATURATE
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype("uint16")
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype("float32")
 
     ##THRESHOLD
     satMask = cv2.inRange(hsv, (0, minSat, 0), (255, 255,255))
     satMask = satMask > 0
 
-    threshold = np.zeros_like(img,np.uint16)
+    threshold = np.zeros_like(img,np.uint8)
 
     threshold[satMask] = img[satMask]
 
-    grayscale = cv2.cvtColor(threshold, cv2.COLOR_BGR2GRAY).astype("uint16")
+    grayscale = cv2.cvtColor(threshold, cv2.COLOR_BGR2GRAY).astype("uint8")
 
-    #if(useDepth):
-        #diff = cv2.absdiff(grayscale,depthImage)
+    if(useDepth):
+        grayscale = cv2.absdiff(grayscale,depthImage)
 
-    #grayscale = cv2.GaussianBlur(grayscale, (25, 25), 20)
+    grayscale = cv2.GaussianBlur(grayscale, (25, 25), 20)
     (minv, maxv, minLoc, maxLoc) = cv2.minMaxLoc(grayscale)
     cv2.circle(img, maxLoc, 5, (255, 0, 0), 2)
 
