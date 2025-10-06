@@ -8,8 +8,6 @@ This project depends on the following libraries and tools:
 - [Eigen3](http://eigen.tuxfamily.org/) - Linear algebra
 - [GLEW](http://glew.sourceforge.net/) - OpenGL extension loader
 - [FFmpeg](https://ffmpeg.org/) - Video processing
-
-## Optional Dependencies (todo)
 - [Intel RealSense SDK 2.0](https://github.com/IntelRealSense/librealsense) - For RGB-D camera support
 
 ## Build Tools
