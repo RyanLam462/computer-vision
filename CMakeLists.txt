@@ -13,9 +13,15 @@ else()
     message(STATUS "GUI mode enabled")
 endif()
 
+set(BUILD_WITH_OPENMP OFF)
+set(BUILD_WITH_CUDA OFF)
+set(BUILD_WITH_DDS OFF)
 # Dependencies
 find_package(OpenCV 4 REQUIRED)
 find_package(Eigen3 3.1.0 REQUIRED)
+
+
+
 find_package(realsense2 REQUIRED)
 
 if(NOT HEADLESS)
