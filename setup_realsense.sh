@@ -16,6 +16,6 @@ fi
 git clone https://github.com/IntelRealSense/librealsense.git
 cd librealsense
 mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_WAYLAND=ON -DBUILD_EXAMPLES=true -DBUILD_GRAPHICAL_EXAMPLES=true
 make -j$(nproc)
 sudo make install

@@ -10,7 +10,7 @@ librealsense/
 Makefile
 *.cmake.user
 *.ninja
-
+*.png
 # -----------------------------
 # Visual Studio Code
 # -----------------------------
