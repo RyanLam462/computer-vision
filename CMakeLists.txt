@@ -33,7 +33,8 @@ if(NOT HEADLESS)
     include_directories(${Pangolin_INCLUDE_DIRS})
 endif()
 
-# Executable
+# Executables
+# Test initial setup
 add_executable(test_initial_setup src/test_initial_setup.cpp)
 target_link_libraries(test_initial_setup
     ${OpenCV_LIBS}
@@ -46,6 +47,21 @@ endif()
 
 # RPATH
 set_target_properties(test_initial_setup PROPERTIES
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH TRUE
+    INSTALL_RPATH "/usr/local/lib"
+)
+
+# Basic Visual Odometry Tracker
+add_executable(basic_vo_tracker src/basic_vo_tracker.cpp)
+target_link_libraries(basic_vo_tracker
+    ${OpenCV_LIBS}
+    ${realsense2_LIBRARY}
+    Eigen3::Eigen
+)
+
+# RPATH
+set_target_properties(basic_vo_tracker PROPERTIES
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH TRUE
     INSTALL_RPATH "/usr/local/lib"
