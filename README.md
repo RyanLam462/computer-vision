@@ -4,7 +4,8 @@ This project builds a cleaned, RGB-D-only version of ORB-SLAM2 specifically conf
 Intended as a semester-long project baseline for research and improvement.
 
 ## Pipeline
-- Initialization
+- Initialization 
+ > Added initializer scripts, headers, tests, mock camera feature that enables users to test without connecting the camera. 
 - Tracking
 - Local Mapping
 - Loop Closing
@@ -42,4 +43,4 @@ ORB-SLAM2-RGBD-D435i/
 ```
 
 # Contributors
-Hwayeon, Arjav, Turki, Gopesh, James, Ryan, Alp, Teymur
+Hwayeon, Arjav, Damien, Ryan, Teymur
