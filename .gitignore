@@ -11,6 +11,7 @@ Makefile
 *.cmake.user
 *.ninja
 *.png
+
 # -----------------------------
 # Visual Studio Code
 # -----------------------------
@@ -55,3 +56,4 @@ __pycache__/
 # Ignore Pangolin build artifacts if included locally
 # -----------------------------
 /Pangolin/build/
+computer
