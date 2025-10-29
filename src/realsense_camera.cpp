@@ -1,4 +1,3 @@
-
 #include "realsense_camera.hpp"
 #include <iostream>
 
