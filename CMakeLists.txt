@@ -88,6 +88,9 @@ set_target_properties(test_initial_setup PROPERTIES
 # Basic Visual Odometry Tracker
 add_executable(basic_vo_tracker src/basic_vo_tracker.cpp)
 target_link_libraries(basic_vo_tracker
+    realsense_camera
+    orb_detector
+    initializer
     ${OpenCV_LIBS}
     ${realsense2_LIBRARY}
     Eigen3::Eigen

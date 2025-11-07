@@ -1,6 +1,7 @@
-#include <librealsense2/rs.hpp>
+#include "realsense_camera.hpp"
+#include "orb_detector.hpp"
+#include "initializer.hpp"
 #include <opencv2/opencv.hpp>
-#include <opencv2/features2d.hpp>
 #include <opencv2/calib3d.hpp>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -9,44 +10,34 @@
 #include <thread>
 #include <chrono>
 
-// Camera intrinsics for Intel RealSense D435i (typical values)
-// You may need to adjust these based on your specific camera calibration
-const float fx = 614.789f;  // focal length x
-const float fy = 615.269f;  // focal length y
-const float cx = 321.558f;  // principal point x
-const float cy = 242.509f;  // principal point y
-
-// Depth scale (meters per depth unit)
-const float depth_scale = 0.001f;
-
 struct Frame {
     cv::Mat color;
     cv::Mat depth;
     std::vector<cv::KeyPoint> keypoints;
     cv::Mat descriptors;
-    double timestamp;
 };
 
-// Convert pixel + depth to 3D point
-cv::Point3f deproject(const cv::Point2f& pixel, float depth_value) {
-    float z = depth_value * depth_scale;
-    float x = (pixel.x - cx) * z / fx;
-    float y = (pixel.y - cy) * z / fy;
+// Convert pixel + depth to 3D point using camera intrinsics
+cv::Point3f deproject(const cv::Point2f& pixel, float depth_value, const rs2_intrinsics& intrinsics) {
+    float z = depth_value;
+    float x = (pixel.x - intrinsics.ppx) * z / intrinsics.fx;
+    float y = (pixel.y - intrinsics.ppy) * z / intrinsics.fy;
     return cv::Point3f(x, y, z);
 }
 
 // Estimate pose using PnP RANSAC
 bool estimatePose(const std::vector<cv::Point3f>& points3d_prev,
                   const std::vector<cv::Point2f>& points2d_curr,
+                  const rs2_intrinsics& intrinsics,
                   cv::Mat& rvec, cv::Mat& tvec) {
     
     if (points3d_prev.size() < 10) {
         return false;
     }
 
-    // Camera intrinsic matrix
-    cv::Mat K = (cv::Mat_<double>(3, 3) << fx, 0, cx,
-                                            0, fy, cy,
+    // Build camera intrinsic matrix from RealSense intrinsics
+    cv::Mat K = (cv::Mat_<double>(3, 3) << intrinsics.fx, 0, intrinsics.ppx,
+                                            0, intrinsics.fy, intrinsics.ppy,
                                             0, 0, 1);
     
     // Use PnP RANSAC to estimate pose
@@ -117,80 +108,62 @@ void printPose(const Eigen::Matrix4d& pose, int frame_num) {
 
 int main(int argc, char** argv) {
     try {
-        std::cout << "=== Basic Visual Odometry Tracker ===" << std::endl;
-        std::cout << "Initializing RealSense camera..." << std::endl;
-
-        // Initialize RealSense pipeline
-        rs2::pipeline pipe;
-        rs2::config cfg;
-        cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_BGR8, 30);
-        cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
+        std::cout << "=== Integrated Visual Odometry System ===" << std::endl;
         
-        rs2::pipeline_profile profile = pipe.start(cfg);
-        
-        // Get depth scale
-        auto depth_sensor = profile.get_device().first<rs2::depth_sensor>();
-        float actual_depth_scale = depth_sensor.get_depth_scale();
-        std::cout << "Depth scale: " << actual_depth_scale << " meters/unit" << std::endl;
+        // Initialize camera
+        std::cout << "\n[Step 1] Initializing camera..." << std::endl;
+        RealSenseCamera camera;
+        rs2_intrinsics intrinsics = camera.getIntrinsics();
 
-        // Create ORB feature detector
-        cv::Ptr<cv::ORB> orb = cv::ORB::create(1000);  // 1000 features
+        // Initialize map using the first frame
+        std::cout << "\n[Step 2] Initializing map from first frame..." << std::endl;
+        Initializer initializer;
+        InitialMapData initial_data;
+        
+        if (!initializer.initialize(camera, initial_data)) {
+            std::cerr << "[ERROR] Map initialization failed!" << std::endl;
+            return EXIT_FAILURE;
+        }
+        
+        std::cout << "[Step 2] Map initialization successful!" << std::endl;
+        std::cout << "  - Initial keypoints: " << initial_data.keypoints.size() << std::endl;
+        std::cout << "  - Initial 3D map points: " << initial_data.map_points.size() << std::endl;
+
+        // Create ORB feature detector for subsequent frames
+        ORBDetector orb_detector(1000);
         
         // BFMatcher for feature matching
         cv::BFMatcher matcher(cv::NORM_HAMMING);
         
+        // Initialize tracking with the first frame from initializer
         Frame prev_frame, curr_frame;
-        Eigen::Matrix4d cumulative_pose = Eigen::Matrix4d::Identity();
+        prev_frame.color = initial_data.color;
+        prev_frame.depth = initial_data.depth;
+        prev_frame.keypoints = initial_data.keypoints;
+        prev_frame.descriptors = initial_data.descriptors;
         
-        bool is_first_frame = true;
-        int frame_count = 0;
+        Eigen::Matrix4d cumulative_pose = initial_data.initial_pose;
+        
+        int frame_count = 1;  // Start from 1 since frame 0 was used for initialization
 
-        std::cout << "\nStarting visual odometry tracking...\n" << std::endl;
+        std::cout << "\n[Step 3] Starting visual odometry tracking...\n" << std::endl;
+        
+        // Print initial pose
+        printPose(cumulative_pose, 0);
 
         // Main tracking loop
         while (true) {
             // 1. Grab synchronized RGB and Depth frames
-            rs2::frameset frames = pipe.wait_for_frames();
-            rs2::video_frame color_frame = frames.get_color_frame();
-            rs2::depth_frame depth_frame = frames.get_depth_frame();
-            
-            curr_frame.color = cv::Mat(
-                cv::Size(color_frame.get_width(), color_frame.get_height()),
-                CV_8UC3, 
-                (void*)color_frame.get_data(), 
-                cv::Mat::AUTO_STEP
-            ).clone();
-            
-            curr_frame.depth = cv::Mat(
-                cv::Size(depth_frame.get_width(), depth_frame.get_height()),
-                CV_16UC1,
-                (void*)depth_frame.get_data(),
-                cv::Mat::AUTO_STEP
-            ).clone();
-            
-            curr_frame.timestamp = color_frame.get_timestamp();
-            
-            // Convert to grayscale for feature detection
-            cv::Mat gray;
-            cv::cvtColor(curr_frame.color, gray, cv::COLOR_BGR2GRAY);
+            if (!camera.getFrame(curr_frame.color, curr_frame.depth)) {
+                std::cerr << "Failed to get frame, skipping..." << std::endl;
+                continue;
+            }
             
             // 2. Extract ORB features from RGB frame
-            orb->detectAndCompute(gray, cv::Mat(), curr_frame.keypoints, curr_frame.descriptors);
+            orb_detector.detectAndCompute(curr_frame.color, curr_frame.keypoints, curr_frame.descriptors);
             
             std::cout << "Frame " << frame_count << ": Detected " 
                       << curr_frame.keypoints.size() << " features" << std::endl;
-            
-            if (is_first_frame) {
-                // Initialize first frame
-                prev_frame = curr_frame;
-                is_first_frame = false;
-                printPose(cumulative_pose, frame_count);
-                frame_count++;
-                
-                // Small delay to allow camera to stabilize
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                continue;
-            }
             
             // 3. Track features from previous frame to current frame
             if (prev_frame.descriptors.empty() || curr_frame.descriptors.empty()) {
@@ -244,10 +217,10 @@ int main(int argc, char** argv) {
                 if (x >= 0 && x < prev_frame.depth.cols && 
                     y >= 0 && y < prev_frame.depth.rows) {
                     
-                    float depth_val = prev_frame.depth.at<uint16_t>(y, x);
+                    float depth_val = prev_frame.depth.at<uint16_t>(y, x) / 1000.0f; // Convert mm to meters
                     
-                    if (depth_val > 0 && depth_val < 10000) {  // valid depth (< 10m)
-                        cv::Point3f point3d = deproject(pt_prev, depth_val);
+                    if (depth_val > 0.1f && depth_val < 10.0f) {  // valid depth (0.1m - 10m)
+                        cv::Point3f point3d = deproject(pt_prev, depth_val, intrinsics);
                         points3d_prev.push_back(point3d);
                         points2d_curr.push_back(pt_curr);
                     }
@@ -258,7 +231,7 @@ int main(int argc, char** argv) {
             
             // Estimate pose using PnP
             cv::Mat rvec, tvec;
-            if (estimatePose(points3d_prev, points2d_curr, rvec, tvec)) {
+            if (estimatePose(points3d_prev, points2d_curr, intrinsics, rvec, tvec)) {
                 // Convert to transformation matrix
                 Eigen::Matrix4d relative_pose = toMatrix4d(rvec, tvec);
                 
@@ -284,9 +257,6 @@ int main(int argc, char** argv) {
         
         std::cout << "\nTracking finished." << std::endl;
         
-    } catch (const rs2::error& e) {
-        std::cerr << "[RealSense ERROR] " << e.what() << std::endl;
-        return EXIT_FAILURE;
     } catch (const std::exception& e) {
         std::cerr << "[EXCEPTION] " << e.what() << std::endl;
         return EXIT_FAILURE;

@@ -3,6 +3,11 @@
 #include <opencv2/calib3d.hpp>
 
 bool Initializer::initialize(RealSenseCamera &camera) {
+    InitialMapData dummy_data;
+    return initialize(camera, dummy_data);
+}
+
+bool Initializer::initialize(RealSenseCamera &camera, InitialMapData &initial_data) {
     std::cout << "[Initializer] Starting map initialization..." << std::endl;
     
     // Capture a single RGB-D frame
@@ -11,6 +16,10 @@ bool Initializer::initialize(RealSenseCamera &camera) {
         std::cerr << "[Initializer] Failed to capture frame" << std::endl;
         return false;
     }
+    
+    // Store frame data
+    initial_data.color = color.clone();
+    initial_data.depth = depth.clone();
     
     std::cout << "[Initializer] Captured RGB-D frame: " 
               << color.cols << "x" << color.rows << std::endl;
@@ -42,15 +51,22 @@ bool Initializer::initialize(RealSenseCamera &camera) {
         return false;
     }
     
+    // Store keypoints and descriptors
+    initial_data.keypoints = keypoints;
+    initial_data.descriptors = descriptors.clone();
+    
     // Extract 3D coordinates using depth map
     rs2_intrinsics intrinsics = camera.getIntrinsics();
     std::vector<MapPoint> map_points = backProjectKeypoints(keypoints, depth, intrinsics);
+    
+    // Store map points
+    initial_data.map_points = map_points;
     
     std::cout << "[Initializer] Created " << map_points.size() 
               << " 3D map points" << std::endl;
     
     // Set the first camera pose (identity matrix for the initial frame)
-    cv::Mat camera_pose = cv::Mat::eye(4, 4, CV_64F);
+    initial_data.initial_pose = Eigen::Matrix4d::Identity();
     std::cout << "[Initializer] Set initial camera pose (identity matrix)" << std::endl;
     
     // Print some statistics
