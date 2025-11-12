@@ -11,8 +11,8 @@ Intended as a semester-long project baseline for research and improvement.
 
     This step stablishes the very first map and camera pose from a single RGB-D frame captured by the RealSense camera. It begins by acquiring synchronized color and depth images, which are then converted and saved for debugging. The color frame is processed using an ORB feature detector to extract distinctive keypoints and descriptors. Each 2D keypoint is then back-projected into 3D space using its corresponding depth value and the camera’s intrinsic parameters, producing a set of `MapPoint` structures that represent points in the environment. An initial camera pose—defined as the identity transformation—is assigned to this first frame, effectively anchoring the coordinate system for subsequent mapping and tracking. This step produces a consistent, depth-based 3D map seed from which the visual SLAM system can grow.
 
-- Tracking (Ryan)
-- Local Mapping
+- Local Tracking(Ryan)
+- Mapping (Damien)
 - Loop Closing
 
 ## Building
