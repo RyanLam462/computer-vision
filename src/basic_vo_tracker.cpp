@@ -115,17 +115,27 @@ int main(int argc, char** argv) {
         RealSenseCamera camera;
         rs2_intrinsics intrinsics = camera.getIntrinsics();
 
-        // Initialize map using the first frame
-        std::cout << "\n[Step 2] Initializing map from first frame..." << std::endl;
+        // Initialize map using multi-frame approach (2-3 frames) for better reliability
+        std::cout << "\n[Step 2] Initializing map with multi-frame approach..." << std::endl;
         Initializer initializer;
         InitialMapData initial_data;
         
-        if (!initializer.initialize(camera, initial_data)) {
-            std::cerr << "[ERROR] Map initialization failed!" << std::endl;
-            return EXIT_FAILURE;
+        // Use 3 frames for initialization (configurable)
+        const int NUM_INIT_FRAMES = 3;
+        
+        if (!initializer.initializeMultiFrame(camera, initial_data, NUM_INIT_FRAMES)) {
+            std::cerr << "[ERROR] Multi-frame map initialization failed!" << std::endl;
+            std::cerr << "         Falling back to single-frame initialization..." << std::endl;
+            
+            // Fallback to single-frame initialization
+            if (!initializer.initialize(camera, initial_data)) {
+                std::cerr << "[ERROR] Single-frame initialization also failed!" << std::endl;
+                return EXIT_FAILURE;
+            }
         }
         
         std::cout << "[Step 2] Map initialization successful!" << std::endl;
+        std::cout << "  - Frames used: " << initial_data.num_frames_used << std::endl;
         std::cout << "  - Initial keypoints: " << initial_data.keypoints.size() << std::endl;
         std::cout << "  - Initial 3D map points: " << initial_data.map_points.size() << std::endl;
 
